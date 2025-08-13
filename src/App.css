@@ -1,0 +1,30 @@
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import ChatApp from '@/components/ChatApp';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Главная страница */}
+        <Route
+          path="/"
+          element={
+            <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center">
+              <h1 className="text-3xl font-bold text-black dark:text-white mb-6">Добро пожаловать в CRM-чат</h1>
+              <Link
+                to="/chat"
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded transition"
+              >
+                Открыть чат
+              </Link>
+            </div>
+          }
+        />
+        {/* Страница чата */}
+        <Route path="/chat" element={<ChatApp />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
