@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import ChatList from './ChatList';
-import { Chat, ChatMessage, Auth } from '@/types/chat';
+import { Chat, ChatMessage as MessageType, Auth } from '@/types/chat';
 import { useChatStore } from '@/store/useChatStore';
 import { useEffect, useState } from 'react';
 import ChatWindow from './ChatWindow';
@@ -8,13 +8,15 @@ import ChatWindow from './ChatWindow';
 interface ChatAppProps {
   api: {
     fetchChats: (auth: Auth) => Promise<Chat[]>;
-    fetchMessages: (chatId: number, auth: Auth) => Promise<ChatMessage[]>;
+    fetchMessages: (chatId: number, auth: Auth) => Promise<MessageType[]>;
     sendMessage: (chatId: number, text: string, auth: Auth) => Promise<void>;
+    deleteMessage: (chatId: number, messageId: string, auth: Auth) => Promise<void>;
+    sendAttachment: (chatId: number, file: File, auth: Auth, text?: string) => Promise<MessageType>;
   };
   webSocket: {
     connect: (auth: Auth) => void;
     disconnect: () => void;
-    subscribe: (callback: (data: ChatMessage) => void) => void;
+    subscribe: (callback: (data: MessageType) => void) => void;
     send: (data: { chatId: number; content: string }) => void;
   };
   auth: Auth;
@@ -43,7 +45,7 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
     const updatedChats = chats.map((chat) =>
       chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
     );
-    setChats(updatedChats); // Это автоматически сохранит через useChatStore
+    setChats(updatedChats);
   };
 
   const handleGoBack = () => {
@@ -54,7 +56,7 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (activeChatId && messageText.trim()) {
-      const newMessage: ChatMessage = {
+      const newMessage: MessageType = {
         id: Date.now().toString(),
         text: messageText.trim(),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -71,11 +73,36 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
               }
             : chat
         );
-        setChats(updatedChats); // Сохранение через useChatStore
+        setChats(updatedChats);
         setMessageText('');
       }).catch((error) => {
         console.error('Ошибка отправки:', error);
         addMessage(activeChatId, '', '');
+      });
+    }
+  };
+
+  const handleSendAttachment = (file: File) => {
+    if (activeChatId) {
+      const text = messageText.trim();
+      api.sendAttachment(activeChatId, file, auth, text || undefined).then((newMessage) => {
+        addMessage(activeChatId, newMessage.text || '', newMessage.author, newMessage.attachment);
+        const lastMessage = newMessage.attachment
+          ? `Вложение: ${newMessage.attachment.name}`
+          : newMessage.text;
+        const updatedChats = chats.map((chat) =>
+          chat.id === activeChatId
+            ? {
+                ...chat,
+                lastMessage,
+                lastMessageTime: newMessage.timestamp,
+              }
+            : chat
+        );
+        setChats(updatedChats);
+        setMessageText(''); // Сброс текста после отправки
+      }).catch((error) => {
+        console.error('Ошибка отправки вложения:', error);
       });
     }
   };
@@ -122,17 +149,21 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
           <ChatWindow
             goBack={handleGoBack}
             api={api}
+            auth={auth}
             messageText={messageText}
             setMessageText={setMessageText}
             onSendMessage={handleSendMessage}
+            onSendAttachment={handleSendAttachment}
           />
         </main>
         <main className="hidden md:flex flex-1 flex-col bg-gray-50 dark:bg-gray-900 min-h-[calc(100vh-4rem)]">
           <ChatWindow
             api={api}
+            auth={auth}
             messageText={messageText}
             setMessageText={setMessageText}
             onSendMessage={handleSendMessage}
+            onSendAttachment={handleSendAttachment}
           />
         </main>
       </div>

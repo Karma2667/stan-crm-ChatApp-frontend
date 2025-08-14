@@ -1,22 +1,22 @@
 import { create } from 'zustand';
-import { Chat, ChatMessage } from '@/types/chat';
-import { v4 as uuidv4 } from 'uuid'; // Импортируем uuid для уникальных ID
+import { Chat, ChatMessage as MessageType, Auth } from '@/types/chat';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ChatStore {
   chats: Chat[];
   activeChatId: number | undefined;
-  messages: Record<number, ChatMessage[]>; // Словарь сообщений по chatId
+  messages: Record<number, MessageType[]>;
+  auth: Auth;
   setChats: (chats: Chat[]) => void;
   setActiveChatId: (chatId: number | undefined) => void;
-  addMessage: (chatId: number, text: string, author: string) => void;
+  addMessage: (chatId: number, text: string, author: string, attachment?: MessageType['attachment']) => void;
+  removeMessage: (chatId: number, messageId: string) => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => {
-  // Загружаем данные из localStorage при инициализации
   const savedState = localStorage.getItem('chatStore');
   const initialState = savedState ? JSON.parse(savedState) : {};
 
-  // Начальные чаты
   const initialChats: Chat[] = [
     {
       id: 1,
@@ -37,8 +37,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
   ];
 
-  // Начальные сообщения для каждого чата
-  const initialMessages: Record<number, ChatMessage[]> = {
+  const initialMessages: Record<number, MessageType[]> = {
     1: [
       { id: uuidv4(), text: 'Привет! Как дела?', timestamp: '10:30', author: 'Иван' },
       { id: uuidv4(), text: 'Хорошо, а у тебя?', timestamp: '10:32', author: 'Ты' },
@@ -49,18 +48,18 @@ export const useChatStore = create<ChatStore>((set, get) => {
     ],
   };
 
-  // Инициализация состояния с учетом сохраненных данных
   const initialChatsState = initialState.chats || initialChats;
   const initialMessagesState = initialState.messages || initialMessages;
   const initialActiveChatId = initialState.activeChatId;
+  const initialAuthState = initialState.auth || {};
 
-  // Функция сохранения полного состояния в localStorage
   const saveToLocalStorage = (state: Partial<ChatStore>) => {
-    const currentState = get(); // Получаем текущее состояние
+    const currentState = get();
     const newState = {
       chats: state.chats || currentState.chats,
       activeChatId: state.activeChatId || currentState.activeChatId,
       messages: state.messages || currentState.messages,
+      auth: state.auth || currentState.auth,
     };
     localStorage.setItem('chatStore', JSON.stringify(newState));
   };
@@ -69,6 +68,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     chats: initialChatsState,
     activeChatId: initialActiveChatId,
     messages: initialMessagesState,
+    auth: initialAuthState,
     setChats: (chats) =>
       set(() => {
         const newState = { chats };
@@ -81,18 +81,30 @@ export const useChatStore = create<ChatStore>((set, get) => {
         saveToLocalStorage(newState);
         return newState;
       }),
-    addMessage: (chatId, text, author) =>
+    addMessage: (chatId, text, author, attachment) =>
       set((state) => {
-        const newMessage: ChatMessage = {
-          id: uuidv4(), // Уникальный ID как строка
+        const newMessage: MessageType = {
+          id: uuidv4(),
           text,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           author,
+          attachment,
         };
         const updatedMessages = {
           ...state.messages,
           [chatId]: [...(state.messages[chatId] || []), newMessage],
         };
+        const newState = { messages: updatedMessages };
+        saveToLocalStorage(newState);
+        return newState;
+      }),
+    removeMessage: (chatId, messageId) =>
+      set((state) => {
+        const updatedMessages = {
+          ...state.messages,
+          [chatId]: state.messages[chatId]?.filter((msg) => msg.id !== messageId) || [],
+        };
+        console.log(`Removing message with id: ${messageId} from chat ${chatId}`); // Отладочный лог
         const newState = { messages: updatedMessages };
         saveToLocalStorage(newState);
         return newState;

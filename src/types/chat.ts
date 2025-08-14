@@ -1,25 +1,26 @@
-// Определение типа чата
+export interface Auth {
+  token: string;
+  userId: number;
+}
+
 export interface Chat {
   id: number;
   name: string;
-  avatar?: string; // Optional: URL аватарки
-  lastMessage?: string; // Optional: Текст последнего сообщения
-  lastMessageTime?: string; // Optional: Время последнего сообщения (например, "10:30")
-  unreadCount?: number; // Optional: Количество непрочитанных сообщений
-  isGroup?: boolean; // Optional: Групповой чат или нет
-  participants?: { id: number; name: string }[]; // Для групп (опционально)
+  avatar?: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  isGroup: boolean;
 }
 
-// Определение типа сообщения
 export interface ChatMessage {
   id: string;
   text: string;
   timestamp: string;
   author: string;
-}
-
-// Новый тип для аутентификации
-export interface Auth {
-  token: string; // Токен авторизации (например, JWT или Bearer token)
-  userId: number; // Идентификатор текущего пользователя
+  attachment?: {
+    url: string; // URL вложения (например, из API или mock)
+    type: string; // MIME-тип, например, "image/png", "application/pdf"
+    name: string; // Имя файла
+  };
 }

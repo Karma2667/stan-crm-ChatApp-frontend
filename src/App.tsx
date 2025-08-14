@@ -1,42 +1,70 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ChatApp from './components/ChatApp';
+import { Auth, Chat, ChatMessage as MessageType } from './types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 const mockApi = {
-  fetchChats: async (auth: { token: string; userId: number }) => [
-    { id: 1, name: 'Тестовый пользователь 1', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User1', lastMessage: 'Привет!', lastMessageTime: '10:30', unreadCount: 2, isGroup: false },
-    { id: 2, name: 'Групповой чат', lastMessage: 'Встреча?', lastMessageTime: '09:45', unreadCount: 0, isGroup: true },
-  ],
-  fetchMessages: async (chatId: number, auth: { token: string; userId: number }) => [
-    { id: uuidv4(), text: 'Привет!', timestamp: '10:30', author: 'Иван' },
-    { id: uuidv4(), text: 'Хорошо!', timestamp: '10:32', author: 'Ты' },
-  ],
-  sendMessage: async (chatId: number, text: string, auth: { token: string; userId: number }) => {
-    console.log(`Отправлено: ${text} в чат ${chatId} с ${auth.token}`);
+  fetchChats: (_auth: Auth) =>
+    Promise.resolve([
+      {
+        id: 1,
+        name: 'Тестовый пользователь 1',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User1',
+        lastMessage: 'Привет! Как дела?',
+        lastMessageTime: '10:30',
+        unreadCount: 2,
+        isGroup: false,
+      },
+      {
+        id: 2,
+        name: 'Групповой чат',
+        lastMessage: 'Встреча в 15:00',
+        lastMessageTime: '09:45',
+        unreadCount: 0,
+        isGroup: true,
+      },
+    ]),
+  fetchMessages: (_chatId: number, _auth: Auth) =>
+    Promise.resolve([
+      { id: '1', text: 'Привет! Как дела?', timestamp: '10:30', author: 'Иван' },
+      { id: '2', text: 'Хорошо, а у тебя?', timestamp: '10:32', author: 'Ты' },
+    ]),
+  sendMessage: (_chatId: number, text: string, _auth: Auth) => {
+    console.log(`Отправлено: ${text} в чат ${_chatId}`);
+    return Promise.resolve();
+  },
+  deleteMessage: (_chatId: number, _messageId: string, _auth: Auth) => {
+    console.log(`Mock deleteMessage: chatId=${_chatId}, messageId=${_messageId}`);
+    return Promise.resolve();
+  },
+  sendAttachment: (_chatId: number, file: File, _auth: Auth, text?: string) => {
+    console.log(`Mock sendAttachment: chatId=${_chatId}, file=${file.name}, type=${file.type}, text=${text || ''}`);
+    const mockUrl = URL.createObjectURL(file); // Временный URL, исчезает после обновления страницы
+    return Promise.resolve({
+      id: uuidv4(),
+      text: text || '',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      author: 'Ты',
+      attachment: {
+        url: mockUrl,
+        type: file.type,
+        name: file.name,
+      },
+    });
   },
 };
 
-class MockWebSocket {
-  connect(auth: { token: string; userId: number }) {
-    console.log('WebSocket connected with', auth);
-  }
-  disconnect() {}
-  subscribe(callback: (data: { id: string; text: string; timestamp: string; author: string }) => void) {}
-  send(data: { chatId: number; content: string }) {}
-}
+const mockWebSocket = {
+  connect: (auth: Auth) => console.log('WebSocket connected with', auth),
+  disconnect: () => console.log('WebSocket disconnected'),
+  subscribe: (callback: (data: any) => void) => console.log('WebSocket subscribed'),
+  send: (data: { chatId: number; content: string }) => console.log('WebSocket send:', data),
+};
 
-const mockWebSocket = new MockWebSocket();
+const mockAuth = { token: 'test-token', userId: 1 };
 
 function App() {
-  const auth = { token: 'test-token', userId: 1 };
-
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/chat" element={<ChatApp api={mockApi} webSocket={mockWebSocket} auth={auth} />} />
-        <Route path="/" element={<div><a href="/chat">Перейти в чат</a></div>} />
-      </Routes>
-    </BrowserRouter>
+    <ChatApp api={mockApi} webSocket={mockWebSocket} auth={mockAuth} />
   );
 }
 
