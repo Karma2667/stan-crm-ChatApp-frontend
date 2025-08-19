@@ -23,4 +23,5 @@ export interface ChatMessage {
     type: string; // MIME-тип, например, "image/png", "application/pdf"
     name: string; // Имя файла
   };
+  isRead?: boolean;
 }

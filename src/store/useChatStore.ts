@@ -11,6 +11,7 @@ interface ChatStore {
   setActiveChatId: (chatId: number | undefined) => void;
   addMessage: (chatId: number, text: string, author: string, attachment?: MessageType['attachment']) => void;
   removeMessage: (chatId: number, messageId: string) => void;
+  editMessageText: (chatId: number, messageId: string, newText: string) => void; // Новый метод
 }
 
 export const useChatStore = create<ChatStore>((set, get) => {
@@ -69,18 +70,21 @@ export const useChatStore = create<ChatStore>((set, get) => {
     activeChatId: initialActiveChatId,
     messages: initialMessagesState,
     auth: initialAuthState,
+
     setChats: (chats) =>
       set(() => {
         const newState = { chats };
         saveToLocalStorage(newState);
         return newState;
       }),
+
     setActiveChatId: (activeChatId) =>
       set(() => {
         const newState = { activeChatId };
         saveToLocalStorage(newState);
         return newState;
       }),
+
     addMessage: (chatId, text, author, attachment) =>
       set((state) => {
         const newMessage: MessageType = {
@@ -98,13 +102,26 @@ export const useChatStore = create<ChatStore>((set, get) => {
         saveToLocalStorage(newState);
         return newState;
       }),
+
     removeMessage: (chatId, messageId) =>
       set((state) => {
         const updatedMessages = {
           ...state.messages,
           [chatId]: state.messages[chatId]?.filter((msg) => msg.id !== messageId) || [],
         };
-        console.log(`Removing message with id: ${messageId} from chat ${chatId}`); // Отладочный лог
+        const newState = { messages: updatedMessages };
+        saveToLocalStorage(newState);
+        return newState;
+      }),
+
+    editMessageText: (chatId, messageId, newText) =>
+      set((state) => {
+        const updatedMessages = {
+          ...state.messages,
+          [chatId]: state.messages[chatId]?.map((msg) =>
+            msg.id === messageId ? { ...msg, text: newText } : msg
+          ) || [],
+        };
         const newState = { messages: updatedMessages };
         saveToLocalStorage(newState);
         return newState;

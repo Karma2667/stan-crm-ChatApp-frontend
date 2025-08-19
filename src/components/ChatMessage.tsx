@@ -1,72 +1,55 @@
-import { useState, useEffect, useRef } from 'react';
 import { ChatMessage as MessageType } from '@/types/chat';
+import { Trash2, Check, CheckCheck, Pin, Pencil } from 'lucide-react';
 
 interface ChatMessageProps {
   message: MessageType;
   isOwnMessage: boolean;
   onDelete?: (messageId: string) => void;
+  onEdit?: (message: MessageType) => void;
+  onPin?: (message: MessageType) => void;
 }
 
-function ChatMessage({ message, isOwnMessage, onDelete }: ChatMessageProps) {
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isOwnMessage) {
-      e.preventDefault();
-      const menuWidth = 150;
-      const menuHeight = 50;
-      const x = e.clientX + menuWidth > window.innerWidth ? window.innerWidth - menuWidth : e.clientX;
-      const y = e.clientY + menuHeight > window.innerHeight ? window.innerHeight - menuHeight : e.clientY;
-      setContextMenuPosition({ x, y });
-      setIsContextMenuOpen(true);
-    }
-  };
-
+function ChatMessage({ message, isOwnMessage, onDelete, onEdit, onPin }: ChatMessageProps) {
   const handleDelete = () => {
     if (onDelete && isOwnMessage) {
-      console.log(`Deleting message with id: ${message.id}`); // Отладочный лог
       onDelete(message.id);
-      setIsContextMenuOpen(false);
     }
   };
 
-  const handleClickOutside = (e: MouseEvent) => {
-    if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-      setIsContextMenuOpen(false);
+  const handleEdit = () => {
+    if (onEdit && isOwnMessage) {
+      onEdit(message);
     }
   };
 
-  useEffect(() => {
-    if (isContextMenuOpen) {
-      document.addEventListener('click', handleClickOutside);
+  const handlePin = () => {
+    if (onPin) {
+      onPin(message);
     }
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [isContextMenuOpen]);
+  };
 
   const renderAttachment = () => {
     if (!message.attachment) return null;
     const { url, type, name } = message.attachment;
+
     if (type.startsWith('image/')) {
       return (
         <img
           src={url}
           alt={name}
-          className="max-w-[200px] mt-2 rounded-lg cursor-pointer"
+          className="max-w-[220px] mt-2 rounded-lg cursor-pointer"
           onClick={() => window.open(url, '_blank')}
         />
       );
     }
+
     return (
       <a
         href={url}
         download={name}
-        className={`mt-2 flex items-center ${isOwnMessage ? 'text-white hover:text-gray-200 dark:hover:text-gray-200' : 'text-black dark:text-white hover:text-gray-600 dark:hover:text-gray-300'}`}
+        className={`mt-2 flex items-center text-sm ${isOwnMessage ? 'text-white hover:text-gray-200' : 'text-black dark:text-white hover:text-gray-600 dark:hover:text-gray-300'}`}
       >
-        <svg className="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
           <path d="M13 7h-2v4H9V7H7l5-5 5 5h-2v6H7v-2h6V7z" />
         </svg>
         {name}
@@ -74,46 +57,57 @@ function ChatMessage({ message, isOwnMessage, onDelete }: ChatMessageProps) {
     );
   };
 
-  const hasTextOrNonImageAttachment = message.text || (message.attachment && !message.attachment.type.startsWith('image/'));
-
   return (
-    <div className={`flex flex-col mb-4 ${isOwnMessage ? 'items-end' : 'items-start'}`}>
-      {hasTextOrNonImageAttachment && (
-        <div
-          className={`max-w-[70%] p-3 rounded-lg flex flex-col ${
-            isOwnMessage
-              ? 'bg-blue-500'
-              : 'bg-gray-200 dark:bg-gray-700'
-          }`}
-          onContextMenu={handleContextMenu}
-        >
-          {message.text && <p className={`text-sm ${isOwnMessage ? 'text-white' : 'text-black dark:text-white'}`}>{message.text}</p>}
-          {message.attachment && !message.attachment.type.startsWith('image/') && renderAttachment()}
+    <div className={`flex flex-col mb-3 ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+      <div
+        className={`relative group p-3 max-w-[65%] rounded-xl shadow-sm flex flex-col ${
+          isOwnMessage ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white'
+        }`}
+      >
+        {message.text && <p className="text-sm">{message.text}</p>}
+        {message.attachment && renderAttachment()}
+
+        <div className={`flex items-center gap-1 text-[11px] mt-1 ${isOwnMessage ? 'justify-end text-white/70' : 'justify-end text-gray-500 dark:text-gray-400'}`}>
+          <span>{message.timestamp}</span>
+          {isOwnMessage && (
+            message.isRead ? (
+              <CheckCheck className="w-4 h-4 text-white" />
+            ) : (
+              <Check className="w-4 h-4 text-white/70" />
+            )
+          )}
         </div>
-      )}
-      {message.attachment && message.attachment.type.startsWith('image/') && renderAttachment()}
-      <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        {message.timestamp} {message.author}
-      </span>
-      {isContextMenuOpen && isOwnMessage && (
-        <div
-          ref={contextMenuRef}
-          className="absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-10"
-          style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
-        >
-          <button
-            onClick={handleDelete}
-            className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            Удалить
-          </button>
-          {/* Будущие опции: */}
-          {/* <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Ответить</button> */}
-          {/* <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Копировать</button> */}
-          {/* <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Редактировать</button> */}
-          {/* <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Переслать</button> */}
+
+        <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+          {onPin && (
+            <button
+              onClick={handlePin}
+              className="p-1 rounded-full bg-black/30 hover:bg-black/50"
+              title="Закрепить"
+            >
+              <Pin className="w-4 h-4 text-white" />
+            </button>
+          )}
+          {isOwnMessage && onEdit && (
+            <button
+              onClick={handleEdit}
+              className="p-1 rounded-full bg-black/30 hover:bg-black/50"
+              title="Редактировать"
+            >
+              <Pencil className="w-4 h-4 text-white" />
+            </button>
+          )}
+          {isOwnMessage && onDelete && (
+            <button
+              onClick={handleDelete}
+              className="p-1 rounded-full bg-black/30 hover:bg-black/50"
+              title="Удалить"
+            >
+              <Trash2 className="w-4 h-4 text-white" />
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
