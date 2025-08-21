@@ -13,15 +13,23 @@ export interface Chat {
   isGroup: boolean;
 }
 
+export interface Attachment {
+  url: string;
+  type: string;
+  name: string;
+}
+
+export type MessageStatus = 'sent' | 'delivered' | 'read';
+
 export interface ChatMessage {
   id: string;
   text: string;
-  timestamp: string;
   author: string;
-  attachment?: {
-    url: string; // URL вложения (например, из API или mock)
-    type: string; // MIME-тип, например, "image/png", "application/pdf"
-    name: string; // Имя файла
-  };
-  isRead?: boolean;
+  timestamp: string;
+  replyTo?: string;
+  attachment?: Attachment;
+  isRead: boolean;
+  status: MessageStatus;
+  forwardedFromId?: string;   // ID оригинального сообщения
+  forwardedFromChatId?: number; 
 }

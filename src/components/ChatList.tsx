@@ -9,9 +9,9 @@ interface ChatListProps {
 function ChatList({ chats, activeChatId, onSelectChat }: ChatListProps) {
   return (
     <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-      {chats.map((chat) => (
+      {chats.map((chat, index) => (
         <li
-          key={chat.id}
+          key={`${chat.id}-${index}`} // ✅ уникальный ключ
           onClick={() => onSelectChat(chat.id)}
           className={`cursor-pointer p-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${
             activeChatId === chat.id ? 'bg-gray-200 dark:bg-gray-600' : ''
