@@ -127,63 +127,73 @@ function ChatWindow({ chatId, goBack, auth }: ChatWindowProps) {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  return (
-    <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900 relative">
+return (
+    <div className="flex flex-col flex-1 h-full bg-gray-50 dark:bg-gray-900 relative">
       {/* Заголовок чата */}
       {chatId && currentChat && (
-        <div className="flex flex-col bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center h-16 px-2">
-            <button
-              onClick={goBack}
-              className="md:hidden p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        <div className="flex items-center h-16 px-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-10 flex-shrink-0">
+          <button
+            onClick={goBack}
+            className="md:hidden p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          >
+            ← Назад
+          </button>
+          {currentChat.avatar ? (
+            <img src={currentChat.avatar} alt={currentChat.name} className="w-12 h-12 rounded-full ml-2 mr-3" />
+          ) : (
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center ${getRandomColor(
+                currentChat.name
+              )} ml-2 mr-3`}
             >
-              ← Назад
-            </button>
-            {currentChat.avatar ? (
-              <img src={currentChat.avatar} alt={currentChat.name} className="w-12 h-12 rounded-full ml-2 mr-3" />
-            ) : (
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getRandomColor(currentChat.name)} ml-2 mr-3`}>
-                <span className="text-white font-semibold text-xl">{currentChat.name.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
-            <h2 className="text-xl font-semibold text-black dark:text-white flex-1">{currentChat.name}</h2>
-          </div>
-
-          {pinnedMessage && (
-            <div className="flex items-center justify-between px-4 py-2 bg-yellow-100 dark:bg-yellow-600">
-              <div className="text-sm truncate max-w-[80%]">
-                <strong>Закреплено:</strong> {pinnedMessage.text || 'Вложение'}
-              </div>
-              <button
-                onClick={() => setPinnedMessage(null)}
-                className="text-xs text-red-600 dark:text-red-200 hover:underline"
-              >
-                Открепить
-              </button>
+              <span className="text-white font-semibold text-xl">
+                {currentChat.name.charAt(0).toUpperCase()}
+              </span>
             </div>
           )}
+          <h2 className="text-xl font-semibold text-black dark:text-white flex-1">{currentChat.name}</h2>
         </div>
       )}
 
-      {/* Сообщения */}
-      <div className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 128px - 64px)' }}>
+      {/* Закрепленное сообщение */}
+      {pinnedMessage && (
+        <div className="sticky top-16 z-10 bg-yellow-100 dark:bg-yellow-600 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="text-sm truncate max-w-[90%]">
+              <strong>Закреплено:</strong> {pinnedMessage.text || 'Вложение'}
+            </div>
+            <button
+              onClick={() => setPinnedMessage(null)}
+              className="text-xs text-red-600 dark:text-red-200 hover:underline"
+            >
+              Открепить
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Список сообщений */}
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col-reverse">
         {chatId ? (
           messages[chatId]?.length > 0 ? (
             <>
-              {messages[chatId].map((message: MessageType, index: number) => (
-                <ChatMessage
-                  key={`${chatId}-${message.id}-${index}`}
-                  message={message}
-                  isOwnMessage={message.author === 'Ты'}
-                  onDelete={handleDeleteMessage}
-                  onEdit={handleEditMessage}
-                  onReply={handleReplyMessage}
-                  onPin={(msg) => setPinnedMessage(msg)}
-                  onForward={handleForwardMessage}
-                  getMessageById={getMessageById}
-                />
-              ))}
               <div ref={messagesEndRef} />
+              {messages[chatId]
+                .slice()
+                .reverse()
+                .map((message: MessageType, index: number) => (
+                  <ChatMessage
+                    key={`${chatId}-${message.id}-${index}`}
+                    message={message}
+                    isOwnMessage={message.author === 'Ты'}
+                    onDelete={handleDeleteMessage}
+                    onEdit={handleEditMessage}
+                    onReply={handleReplyMessage}
+                    onPin={(msg) => setPinnedMessage(msg)}
+                    onForward={handleForwardMessage}
+                    getMessageById={getMessageById}
+                  />
+                ))}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center h-full">
@@ -197,7 +207,83 @@ function ChatWindow({ chatId, goBack, auth }: ChatWindowProps) {
         )}
       </div>
 
-      {/* Красивое модальное окно выбора чата */}
+      {/* Поле ввода */}
+      {chatId && (
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 flex-shrink-0">
+          <form
+            onSubmit={editingMessage ? handleUpdateMessageSubmit : handleSendMessage}
+            className="flex flex-col gap-2"
+          >
+            {editingMessage && (
+              <div className="flex items-center justify-between px-2 py-1 bg-yellow-100 dark:bg-yellow-700 rounded">
+                <span className="text-sm text-black dark:text-white truncate">
+                  Редактирование: {editingMessage.text}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingMessage(null);
+                    setMessageText('');
+                  }}
+                  className="text-xs text-red-600 hover:underline dark:text-red-300"
+                >
+                  Отмена
+                </button>
+              </div>
+            )}
+
+            {replyingTo && (
+              <div className="flex items-center justify-between px-2 py-1 bg-blue-100 dark:bg-blue-700 rounded">
+                <span className="text-sm text-black dark:text-white truncate">Ответ на: {replyingTo.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  className="text-xs text-red-600 hover:underline dark:text-red-300"
+                >
+                  Убрать
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                title="Прикрепить файл"
+              >
+                📎
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/png,image/jpeg,image/gif,application/pdf"
+                className="hidden"
+              />
+
+              <EmojiPicker onSelect={(emoji) => setMessageText((prev) => prev + emoji)} />
+
+              <input
+                type="text"
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder={editingMessage ? 'Редактируйте сообщение...' : 'Напишите сообщение...'}
+                className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+              <button
+                type="submit"
+                disabled={!messageText.trim()}
+                className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {editingMessage ? 'Сохранить' : 'Отправить'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Модальное окно выбора чата */}
       {selectChatForForward && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectChatForForward(false)} />
@@ -217,7 +303,11 @@ function ChatWindow({ chatId, goBack, auth }: ChatWindowProps) {
                     {chat.avatar ? (
                       <img src={chat.avatar} alt={chat.name} className="w-8 h-8 rounded-full" />
                     ) : (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getRandomColor(chat.name)}`}>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${getRandomColor(
+                          chat.name
+                        )}`}
+                      >
                         <span className="text-white font-semibold">{chat.name.charAt(0).toUpperCase()}</span>
                       </div>
                     )}
@@ -234,81 +324,8 @@ function ChatWindow({ chatId, goBack, auth }: ChatWindowProps) {
           </div>
         </div>
       )}
-
-      {/* Поле ввода */}
-      {chatId && (
-        <form
-          onSubmit={editingMessage ? handleUpdateMessageSubmit : handleSendMessage}
-          className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:static"
-        >
-          {editingMessage && (
-            <div className="flex items-center justify-between mb-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-700 rounded">
-              <span className="text-sm text-black dark:text-white truncate">
-                Редактирование: {editingMessage.text}
-              </span>
-              <button
-                type="button"
-                onClick={() => { setEditingMessage(null); setMessageText(''); }}
-                className="text-xs text-red-600 hover:underline dark:text-red-300"
-              >
-                Отмена
-              </button>
-            </div>
-          )}
-
-          {replyingTo && (
-            <div className="flex items-center justify-between mb-2 px-2 py-1 bg-blue-100 dark:bg-blue-700 rounded">
-              <span className="text-sm text-black dark:text-white truncate">
-                Ответ на: {replyingTo.text}
-              </span>
-              <button
-                type="button"
-                onClick={() => setReplyingTo(null)}
-                className="text-xs text-red-600 hover:underline dark:text-red-300"
-              >
-                Убрать
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
-              title="Прикрепить файл"
-            >
-              📎
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/png,image/jpeg,image/gif,application/pdf"
-              className="hidden"
-            />
-
-            <EmojiPicker onSelect={(emoji) => setMessageText((prev) => prev + emoji)} />
-
-            <input
-              type="text"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              placeholder={editingMessage ? 'Редактируйте сообщение...' : 'Напишите сообщение...'}
-              className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            />
-            <button
-              type="submit"
-              disabled={!messageText.trim()}
-              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {editingMessage ? 'Сохранить' : 'Отправить'}
-            </button>
-          </div>
-        </form>
-      )}
     </div>
   );
-}
+};
 
 export default ChatWindow;

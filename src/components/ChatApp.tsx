@@ -54,8 +54,8 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
     setActiveChatId(undefined);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
+   return (
+    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -70,8 +70,8 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
       </header>
 
       {/* Body */}
-      <div className="flex flex-1 mt-16 w-full">
-        {/* Список чатов */}
+      <div className="flex flex-1 mt-16 w-full overflow-hidden">
+        {/* ChatList */}
         <aside
           className={`md:hidden w-full bg-white dark:bg-gray-800 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 overflow-y-auto ${
             isChatListVisible ? 'block' : 'hidden'
@@ -85,8 +85,8 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
 
         {/* ChatWindow */}
         <main
-          className={`md:hidden flex-1 flex-col bg-gray-50 dark:bg-gray-900 min-h-[calc(100vh-4rem)] ${
-            isChatListVisible ? 'hidden' : 'block'
+          className={`flex-1 flex flex-col overflow-hidden md:min-h-[calc(100vh-4rem)] ${
+            isChatListVisible ? 'hidden' : 'flex'
           }`}
         >
           {activeChatId && (
@@ -97,7 +97,7 @@ function ChatApp({ api, webSocket, auth }: ChatAppProps) {
             />
           )}
         </main>
-        <main className="hidden md:flex flex-1 flex-col bg-gray-50 dark:bg-gray-900 min-h-[calc(100vh-4rem)]">
+        <main className="hidden md:flex flex-1 flex-col overflow-hidden md:min-h-[calc(100vh-4rem)]">
           {activeChatId && (
             <ChatWindow
               chatId={activeChatId}
