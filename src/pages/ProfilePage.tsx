@@ -6,58 +6,46 @@ import { useAuthStore } from "@/store/useAuthStore";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { auth, refresh, setAuth } = useAuthStore();
+  const { user, accessToken, logout } = useAuthStore();
 
   const [username, setUsername] = useState("");
-  const [tag, setTag] = useState("");
-  const [avatar, setAvatar] = useState<File | null>(null);
+  const [email, setEmail] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [online, setOnline] = useState(false);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   // 🔹 Загружаем профиль
   useEffect(() => {
-    if (!auth) {
+    if (!user || !accessToken) {
       navigate("/login", { replace: true });
       return;
     }
 
     const fetchProfile = async () => {
       try {
-        const res = await apiClient.get(`/v1/users/${auth.user.id}`, {
-          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        const res = await apiClient.get("/v1/users/current", {
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         setUsername(res.data.username);
-        setTag(res.data.tag || "");
-        setAvatarPreview(res.data.avatar || null);
+        setEmail(res.data.email);
+        setAvatarPreview(res.data.avatar_url || null);
         setOnline(res.data.online);
         setLastSeenAt(res.data.last_seen_at);
       } catch (err: any) {
         console.error("Ошибка загрузки профиля:", err);
-
-        if (err.response?.status === 401) {
-          try {
-            await refresh();
-            if (auth) fetchProfile();
-          } catch {
-            setMessage("⚠️ Не удалось обновить токен. Пожалуйста, войдите снова.");
-            setAuth(null);
-            navigate("/login", { replace: true });
-          }
-        } else {
-          setMessage("⚠️ Не удалось загрузить профиль");
-        }
+        setMessage("⚠️ Не удалось загрузить профиль");
       }
     };
 
     fetchProfile();
-  }, [auth, refresh, navigate, setAuth]);
+  }, [user, accessToken, navigate]);
 
   // 🔹 Изменение аватара
   const handleAvatarChange = (file: File) => {
-    setAvatar(file);
+    setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = () => setAvatarPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -65,21 +53,24 @@ export default function ProfilePage() {
 
   // 🔹 Сохранение профиля
   const handleSaveProfile = async () => {
-    if (!auth) return;
+    if (!accessToken) return;
+
     try {
+      // Обновляем username
       await apiClient.put(
-        `/v1/users/${auth.user.id}`,
-        { username, tag },
-        { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+        "/v1/users/current",
+        { username },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
-      if (avatar) {
+      // Если есть новый аватар — отправляем
+      if (avatarFile) {
         const formData = new FormData();
-        formData.append("avatar", avatar);
+        formData.append("avatar", avatarFile);
 
-        await apiClient.post(`/v1/users/${auth.user.id}/avatar`, formData, {
+        await apiClient.post("/v1/users/current/avatar", formData, {
           headers: {
-            Authorization: `Bearer ${auth.accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "multipart/form-data",
           },
         });
@@ -94,20 +85,8 @@ export default function ProfilePage() {
 
   // 🔹 Логаут
   const handleLogout = () => {
-    setAuth(null);
+    logout();
     navigate("/login", { replace: true });
-  };
-
-  // 🔹 Сброс пароля (письмо на email)
-  const handleRequestPasswordReset = async () => {
-    if (!username) return;
-    try {
-      await apiClient.post(`/v1/auth/request_password_reset`, { email: username });
-      setMessage("📧 Письмо для смены пароля отправлено на почту!");
-    } catch (err: any) {
-      console.error("Ошибка при сбросе пароля:", err);
-      setMessage(err.response?.data?.message || "Ошибка при запросе смены пароля");
-    }
   };
 
   return (
@@ -134,6 +113,7 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+
           <label className="mt-3 cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
             Загрузить аватар
             <input
@@ -167,10 +147,10 @@ export default function ProfilePage() {
           />
           <input
             type="text"
-            placeholder="Тег"
-            value={tag}
-            onChange={(e) => setTag(e.target.value)}
-            className="w-28 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="Email"
+            value={email}
+            disabled
+            className="w-1/2 px-4 py-2 border rounded-lg bg-gray-100 cursor-not-allowed"
           />
         </div>
 
@@ -179,13 +159,6 @@ export default function ProfilePage() {
           className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mb-6"
         >
           Сохранить изменения
-        </button>
-
-        <button
-          onClick={handleRequestPasswordReset}
-          className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors mb-4"
-        >
-          Запросить смену пароля (письмо)
         </button>
 
         <button
