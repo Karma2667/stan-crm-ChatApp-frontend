@@ -1,102 +1,53 @@
-// src/App.tsx
-import ChatApp from './components/ChatApp';
-import { Auth, ChatMessage as MessageType } from './types/chat';
-import { v4 as uuidv4 } from 'uuid';
-
-const mockApi = {
-  fetchChats: (_auth: Auth) =>
-    Promise.resolve([
-      {
-        id: 1,
-        name: 'Тестовый пользователь 1',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User1',
-        lastMessage: 'Привет! Как дела?',
-        lastMessageTime: '10:30',
-        unreadCount: 2,
-        isGroup: false,
-      },
-      {
-        id: 2,
-        name: 'Групповой чат',
-        lastMessage: 'Встреча в 15:00',
-        lastMessageTime: '09:45',
-        unreadCount: 0,
-        isGroup: true,
-      },
-    ]),
-
-  fetchMessages: (_chatId: number, _auth: Auth) =>
-    Promise.resolve([
-      {
-        id: uuidv4(),
-        text: 'Привет! Как дела?',
-        timestamp: '10:30',
-        author: 'Иван',
-        isRead: true,
-        status: 'read',
-      },
-      {
-        id: uuidv4(),
-        text: 'Хорошо, а у тебя?',
-        timestamp: '10:32',
-        author: 'Ты',
-        isRead: false,
-        status: 'sent',
-      },
-    ] as MessageType[]),
-
-  sendMessage: (_chatId: number, text: string, auth: Auth) => {
-    console.log(`Отправлено: ${text} в чат ${_chatId}`);
-    return Promise.resolve({
-      id: uuidv4(),
-      text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      author: 'Ты',
-      isRead: false,
-      status: 'sent',
-    } as MessageType);
-  },
-
-  deleteMessage: (_chatId: number, _messageId: string, _auth: Auth) => {
-    console.log(`Mock deleteMessage: chatId=${_chatId}, messageId=${_messageId}`);
-    return Promise.resolve();
-  },
-
-  updateMessage: (_chatId: number, _messageId: string, text: string, _auth: Auth) => {
-    console.log(`Mock updateMessage: chatId=${_chatId}, messageId=${_messageId}, newText="${text}"`);
-    return Promise.resolve();
-  },
-
-  sendAttachment: (_chatId: number, file: File, _auth: Auth, text?: string) => {
-    console.log(`Mock sendAttachment: chatId=${_chatId}, file=${file.name}, type=${file.type}, text=${text || ''}`);
-    const mockUrl = URL.createObjectURL(file); // Временный URL
-    return Promise.resolve({
-      id: uuidv4(),
-      text: text || '',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      author: 'Ты',
-      isRead: false,
-      status: 'sent',
-      attachment: {
-        url: mockUrl,
-        type: file.type,
-        name: file.name,
-      },
-    } as MessageType);
-  },
-};
-
-const mockWebSocket = {
-  connect: (auth: Auth) => console.log('WebSocket connected with', auth),
-  disconnect: () => console.log('WebSocket disconnected'),
-  subscribe: () => console.log('WebSocket subscribed'),
-  send: (data: { chatId: number; content: string }) => console.log('WebSocket send:', data),
-};
-
-const mockAuth: Auth = { token: 'test-token', userId: 1 };
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import ChatApp from "./components/ChatApp";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import ProfilePage from "./pages/ProfilePage"; // <-- импорт без пропса
+import Header from "./components/Header";
+import { useAuthStore } from "./store/useAuthStore";
+import { subscribeToChat } from "./services/cable";
+import { api } from "./api/chatService";
 
 function App() {
-  return <ChatApp api={mockApi} webSocket={mockWebSocket} auth={mockAuth} />;
+  const { getAppAuth, refresh, loading, setAuth } = useAuthStore();
+  const auth = getAppAuth();
+
+  useEffect(() => {
+    // При загрузке пытаемся обновить токен
+    if (auth?.refreshToken) {
+      refresh().catch(() => setAuth(null));
+    }
+  }, [auth, refresh, setAuth]);
+
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+
+  const realWebSocket = auth
+    ? {
+        connect: () => console.log("WS connected with", auth.username),
+        disconnect: () => console.log("WS disconnected"),
+        subscribe: (callback: (msg: any) => void) => subscribeToChat(1, callback, auth.token),
+        send: (data: { chatId: number; content: string }) =>
+          api.sendMessage(data.chatId, data.content, auth).then((msg) => console.log("Sent message:", msg)),
+      }
+    : null;
+
+  return (
+    <>
+      {auth && <Header username={auth.username} avatar={auth.avatar || undefined} online={auth.online} />}
+
+      <Routes>
+        <Route path="/" element={auth ? <HomePage /> : <Navigate to="/login" />} />
+        <Route
+          path="/chat"
+          element={auth && realWebSocket ? <ChatApp auth={auth} api={api} webSocket={realWebSocket} /> : <Navigate to="/login" />}
+        />
+        <Route path="/profile" element={auth ? <ProfilePage /> : <Navigate to="/login" />} />
+        <Route path="/login" element={auth ? <Navigate to="/" /> : <LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    </>
+  );
 }
 
 export default App;

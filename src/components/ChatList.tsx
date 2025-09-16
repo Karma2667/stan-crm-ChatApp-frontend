@@ -9,13 +9,13 @@ interface ChatListProps {
 function ChatList({ chats, activeChatId, onSelectChat }: ChatListProps) {
   return (
     <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-      {chats.map((chat, index) => (
+      {chats.map((chat) => (
         <li
-          key={`${chat.id}-${index}`} // ✅ уникальный ключ
+          key={chat.id}
           onClick={() => onSelectChat(chat.id)}
-          className={`cursor-pointer p-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${
-            activeChatId === chat.id ? 'bg-gray-200 dark:bg-gray-600' : ''
-          } ${chat.unreadCount && chat.unreadCount > 0 ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
+          className={`cursor-pointer p-3 hover:bg-gray-100 dark:hover:bg-gray-700 
+                      ${activeChatId === chat.id ? 'bg-gray-200 dark:bg-gray-600' : ''} 
+                      ${chat.unreadCount && chat.unreadCount > 0 ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
         >
           <div className="flex items-center">
             {chat.avatar ? (
@@ -30,7 +30,11 @@ function ChatList({ chats, activeChatId, onSelectChat }: ChatListProps) {
             <div className="flex-1">
               <div className="text-sm font-medium text-black dark:text-white">{chat.name}</div>
               {chat.lastMessage && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{chat.lastMessage}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {typeof chat.lastMessage === 'string'
+                    ? chat.lastMessage
+                    : chat.lastMessage.text}
+                </div>
               )}
             </div>
             {chat.unreadCount && chat.unreadCount > 0 && (

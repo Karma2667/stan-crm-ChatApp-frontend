@@ -7,7 +7,7 @@ export interface Chat {
   id: number;
   name: string;
   avatar?: string;
-  lastMessage: string;
+  lastMessage: ChatMessage | null; // <-- изменено
   lastMessageTime: string;
   unreadCount: number;
   isGroup: boolean;
