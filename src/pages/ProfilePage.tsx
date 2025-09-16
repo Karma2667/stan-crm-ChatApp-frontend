@@ -1,125 +1,16 @@
-// src/pages/ProfilePage.tsx
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { useAuthStore } from "@/store/useAuthStore";
-
-interface UserProfile {
-  id: number;
-  username: string;
-  email: string;
-  avatar_url?: string | null;
-  online?: boolean;
-  last_seen_at?: string | null;
-}
+import { useProfile } from "@/hooks/useProfile";
 
 export default function ProfilePage() {
-  const navigate = useNavigate();
-  const { user, accessToken, refresh, logout } = useAuthStore();
-
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-
-  // 🔹 Загружаем профиль
-  useEffect(() => {
-    if (!user || !accessToken) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get<UserProfile>("/api/v1/users/current", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        setProfile(res.data);
-        setAvatarPreview(res.data.avatar_url || null);
-      } catch (err: any) {
-        console.error("Ошибка загрузки профиля:", err);
-        if (err.response?.status === 401) {
-          try {
-            await refresh();
-            fetchProfile();
-          } catch {
-            setMessage("⚠️ Не удалось обновить токен. Войдите снова.");
-            logout();
-            navigate("/login", { replace: true });
-          }
-        } else {
-          setMessage("⚠️ Не удалось загрузить профиль");
-        }
-      }
-    };
-
-    fetchProfile();
-  }, [user, accessToken, refresh, navigate, logout]);
-
-  // 🔹 Изменение аватара
-  const handleAvatarChange = (file: File) => {
-    setAvatarFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setAvatarPreview(reader.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  // 🔹 Сохранение профиля
-  const handleSaveProfile = async () => {
-    if (!accessToken || !profile) return;
-
-    try {
-      await axios.put(
-        "/api/v1/users/current",
-        { username: profile.username },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-
-      if (avatarFile) {
-        const formData = new FormData();
-        formData.append("avatar", avatarFile);
-        await axios.post("/api/v1/users/current/avatar", formData, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "multipart/form-data",
-          },
-        });
-      }
-
-      setMessage("✅ Профиль обновлён!");
-    } catch (err: any) {
-      console.error("Ошибка обновления профиля:", err);
-      setMessage(err.response?.data?.message || "Ошибка обновления");
-    }
-  };
-
-  // 🔹 Запрос на смену пароля
-  const handleRequestPasswordReset = async () => {
-    if (!profile?.email) return;
-
-    try {
-      await axios.post("/api/v1/auth/request_password_reset", {
-        auth: { email: profile.email },
-      });
-      setMessage("📧 Письмо для смены пароля отправлено на почту!");
-    } catch (err: any) {
-      console.error("Ошибка при сбросе пароля:", err);
-      setMessage(err.response?.data?.message || "Ошибка при запросе смены пароля");
-    }
-  };
-
-  // 🔹 Логаут
-  const handleLogout = async () => {
-    try {
-      if (accessToken) {
-        await axios.delete("/api/v1/auth/logout", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-      }
-    } catch {}
-    logout();
-    navigate("/login", { replace: true });
-  };
+  const {
+    profile,
+    avatarPreview,
+    message,
+    setProfile,
+    handleAvatarChange,
+    handleSaveProfile,
+    requestPasswordReset,
+    handleLogout,
+  } = useProfile();
 
   if (!profile) return <p className="text-center mt-10">Загрузка...</p>;
 
@@ -129,7 +20,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-black dark:text-white">Мой профиль</h1>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => history.back()}
             className="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors"
           >
             Назад
@@ -195,7 +86,7 @@ export default function ProfilePage() {
         </button>
 
         <button
-          onClick={handleRequestPasswordReset}
+          onClick={requestPasswordReset}
           className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors mb-4"
         >
           Запросить смену пароля (письмо)
