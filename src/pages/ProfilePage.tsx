@@ -1,5 +1,6 @@
-// src/pages/ProfilePage.tsx
 import { useProfile } from "@/hooks/useProfile";
+import { useEffect } from "react";
+import axios from "axios";
 
 export default function ProfilePage() {
   const {
@@ -13,6 +14,45 @@ export default function ProfilePage() {
     setProfile,
     handleRemoveAvatar,
   } = useProfile();
+
+  // 🔹 Логика HTTP ping для онлайн-статуса
+  useEffect(() => {
+  let isMounted = true;
+  let lastPingTime = Date.now();
+
+  const pingPresence = async () => {
+    try {
+      const res = await axios.post("/api/v1/users/ping", {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+      });
+
+      if (!isMounted) return;
+
+      lastPingTime = Date.now();
+      setProfile(prev => prev ? { ...prev, online: res.data.online, last_seen_at: res.data.last_seen_at } : prev);
+    } catch (err) {
+      console.error("Ошибка ping:", err);
+    }
+  };
+
+  pingPresence(); // первый пинг сразу
+
+  const interval = setInterval(() => {
+    // если прошло больше 35 секунд с последнего пинга — считаем offline
+    const now = Date.now();
+    setProfile(prev => prev ? { 
+      ...prev, 
+      online: now - lastPingTime <= 35_000 ? prev.online : false 
+    } : prev);
+
+    pingPresence();
+  }, 25_000);
+
+  return () => {
+    isMounted = false;
+    clearInterval(interval);
+  };
+}, []);
 
   if (!profile) return <p className="text-center mt-10">Загрузка...</p>;
 
