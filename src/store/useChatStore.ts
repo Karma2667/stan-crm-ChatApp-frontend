@@ -1,18 +1,17 @@
-// src/store/useChatStore.ts
 import { create } from 'zustand';
-import { Chat, ChatMessage as MessageType, Auth } from '@/types/chat';
+import { Chat, ChatMessage, Auth } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ChatStore {
   chats: Chat[];
-  activeChatId: number | undefined;
-  messages: Record<number, MessageType[]>;
+  activeChatId?: number;
+  messages: Record<number, ChatMessage[]>;
   auth: Auth;
 
   setChats: (chats: Chat[]) => void;
-  setActiveChatId: (chatId: number | undefined) => void;
+  setActiveChatId: (chatId?: number) => void;
 
-  addMessage: (chatId: number, message: MessageType) => void;
+  addMessage: (chatId: number, message: ChatMessage) => void;
   removeMessage: (chatId: number, messageId: string) => void;
   editMessageText: (chatId: number, messageId: string, newText: string) => void;
   forwardMessage: (messageId: string, targetChatId: number) => void;
@@ -53,7 +52,7 @@ const initialChats: Chat[] = [
   },
 ];
 
-const initialMessages: Record<number, MessageType[]> = {
+const initialMessages: Record<number, ChatMessage[]> = {
   1: [
     { id: uuidv4(), text: 'Привет! Как дела?', timestamp: '10:30', author: 'Иван', isRead: true, status: 'read' },
     { id: uuidv4(), text: 'Хорошо, а у тебя?', timestamp: '10:32', author: 'Ты', isRead: false, status: 'sent' },
@@ -64,11 +63,18 @@ const initialMessages: Record<number, MessageType[]> = {
   ],
 };
 
-export const useChatStore = create<ChatStore>((set, get) => ({
+export const useChatStore = create<ChatStore>((set) => ({
   chats: initialChats,
   activeChatId: undefined,
   messages: initialMessages,
-  auth: { token: 'test-token', userId: 1 },
+  auth: {
+    token: 'test-token',
+    userId: 1,
+    username: 'TestUser',
+    email: 'test@example.com',
+    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User1',
+    online: true,
+  },
 
   setChats: (chats) => set({ chats }),
   setActiveChatId: (activeChatId) => set({ activeChatId }),
@@ -108,7 +114,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const originalMessage = state.messages[sourceChatId].find((msg) => msg.id === messageId);
       if (!originalMessage) return state;
 
-      const newMessage: MessageType = {
+      const newMessage: ChatMessage = {
         ...originalMessage,
         id: uuidv4(),
         author: 'Ты',

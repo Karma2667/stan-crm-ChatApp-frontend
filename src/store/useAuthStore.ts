@@ -1,4 +1,3 @@
-// src/store/useAuthStore.ts
 import { create } from "zustand";
 import axios from "axios";
 
@@ -6,7 +5,8 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
+  online?: boolean;
 }
 
 interface AuthState {
@@ -16,12 +16,11 @@ interface AuthState {
   loading: boolean;
   error: string | null;
 
-  // Методы управления
   setAuth: (user: User | null, accessToken?: string, refreshToken?: string) => void;
-  refresh: () => Promise<void>;
   login: (data: { email: string; password: string }) => Promise<void>;
   register: (data: { email: string; username: string; password: string; passwordConfirmation: string }) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
+  refresh: () => Promise<boolean>;
   getAppAuth: () => boolean;
 }
 
@@ -38,7 +37,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loading: false,
   error: null,
 
-  // 🔹 Установить аутентификацию
   setAuth: (user, accessToken, refreshToken) => {
     set({ user, accessToken: accessToken || null, refreshToken: refreshToken || null });
     if (user) localStorage.setItem("user", JSON.stringify(user));
@@ -49,26 +47,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     else localStorage.removeItem("refreshToken");
   },
 
-  // 🔹 Обновление токена
-  refresh: async () => {
-    const token = get().refreshToken;
-    if (!token) {
-      get().logout();
-      return;
-    }
-    try {
-      const res = await apiClient.post("/v1/auth/refresh", { refresh_token: token });
-      const { access_token, refresh_token } = res.data;
-      set({ accessToken: access_token, refreshToken: refresh_token });
-      localStorage.setItem("accessToken", access_token);
-      localStorage.setItem("refreshToken", refresh_token);
-    } catch (err) {
-      console.error("Не удалось обновить токен", err);
-      await get().logout();
-    }
-  },
-
-  // 🔹 Логин
   login: async (data) => {
     set({ loading: true, error: null });
     try {
@@ -76,13 +54,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { access_token, refresh_token, user } = res.data;
       get().setAuth(user, access_token, refresh_token);
     } catch (err: any) {
-      set({ error: err.response?.data?.message || err.message || "Ошибка входа", loading: false });
+      set({ error: err.response?.data?.message || err.message || "Ошибка входа" });
     } finally {
       set({ loading: false });
     }
   },
 
-  // 🔹 Регистрация
   register: async (data) => {
     set({ loading: true, error: null });
     try {
@@ -101,16 +78,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  // 🔹 Логаут
-  logout: async () => {
-    set({ loading: true, error: null });
-    try {
-      await apiClient.delete("/v1/auth/logout");
-    } catch (_) {}
+  logout: () => {
     get().setAuth(null);
-    set({ loading: false });
   },
 
-  // 🔹 Проверка авторизации
-  getAppAuth: () => !!get().accessToken,
+  refresh: async () => {
+    const token = get().refreshToken;
+    if (!token) return false;
+    try {
+      const res = await apiClient.post("/v1/auth/refresh", { refresh_token: token });
+      const { access_token, refresh_token } = res.data;
+      set({ accessToken: access_token, refreshToken: refresh_token });
+      localStorage.setItem("accessToken", access_token);
+      localStorage.setItem("refreshToken", refresh_token);
+      return true;
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        console.warn("Refresh токен недействителен, оставляем текущего пользователя");
+        return false; // ❌ не делаем logout
+      }
+      console.error("Ошибка обновления токена", err);
+      return false;
+    }
+  },
+
+  getAppAuth: () => !!get().accessToken && !!get().user,
 }));

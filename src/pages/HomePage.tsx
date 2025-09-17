@@ -3,19 +3,16 @@ import { useAuthStore } from "@/store/useAuthStore";
 import Header from "../components/Header";
 
 export default function HomePage() {
-  const { getAppAuth } = useAuthStore();
-  const auth = getAppAuth();
+  const { user } = useAuthStore();
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Шапка */}
       <Header
-        username={auth?.username || "Гость"}
-        avatar={auth?.avatar || undefined} // ✅ Преобразуем null в undefined
-        online={auth?.online ?? false}
+        username={user?.username || "Гость"}
+        avatar={user?.avatar_url || undefined}
+        online={user?.online ?? false}
       />
 
-      {/* Контент */}
       <main className="pt-20 flex items-center justify-center">
         <h1 className="text-2xl font-bold text-blue-600">
           Добро пожаловать в CRM-Чат 🚀
