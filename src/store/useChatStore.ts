@@ -1,3 +1,4 @@
+// src/store/useChatStore.ts
 import { create } from 'zustand';
 import { Chat, ChatMessage, Auth } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
@@ -17,7 +18,7 @@ interface ChatStore {
   forwardMessage: (messageId: string, targetChatId: number) => void;
 }
 
-// Начальные данные
+// Начальные данные для демонстрации
 const initialChats: Chat[] = [
   {
     id: 1,
@@ -27,11 +28,11 @@ const initialChats: Chat[] = [
       id: uuidv4(),
       text: 'Привет! Как дела?',
       author: 'Иван',
-      timestamp: '10:30',
+      timestamp: new Date().toISOString(),
       isRead: true,
       status: 'read',
     },
-    lastMessageTime: '10:30',
+    lastMessageTime: new Date().toISOString(),
     unreadCount: 2,
     isGroup: false,
   },
@@ -42,11 +43,11 @@ const initialChats: Chat[] = [
       id: uuidv4(),
       text: 'Встреча в 15:00',
       author: 'Аня',
-      timestamp: '09:45',
+      timestamp: new Date().toISOString(),
       isRead: true,
       status: 'read',
     },
-    lastMessageTime: '09:45',
+    lastMessageTime: new Date().toISOString(),
     unreadCount: 0,
     isGroup: true,
   },
@@ -54,16 +55,44 @@ const initialChats: Chat[] = [
 
 const initialMessages: Record<number, ChatMessage[]> = {
   1: [
-    { id: uuidv4(), text: 'Привет! Как дела?', timestamp: '10:30', author: 'Иван', isRead: true, status: 'read' },
-    { id: uuidv4(), text: 'Хорошо, а у тебя?', timestamp: '10:32', author: 'Ты', isRead: false, status: 'sent' },
+    {
+      id: uuidv4(),
+      text: 'Привет! Как дела?',
+      timestamp: new Date().toISOString(),
+      author: 'Иван',
+      isRead: true,
+      status: 'read',
+    },
+    {
+      id: uuidv4(),
+      text: 'Хорошо, а у тебя?',
+      timestamp: new Date().toISOString(),
+      author: 'Ты',
+      isRead: false,
+      status: 'sent',
+    },
   ],
   2: [
-    { id: uuidv4(), text: 'Встреча в 15:00', timestamp: '09:45', author: 'Аня', isRead: true, status: 'read' },
-    { id: uuidv4(), text: 'Ок, буду!', timestamp: '09:47', author: 'Ты', isRead: false, status: 'sent' },
+    {
+      id: uuidv4(),
+      text: 'Встреча в 15:00',
+      timestamp: new Date().toISOString(),
+      author: 'Аня',
+      isRead: true,
+      status: 'read',
+    },
+    {
+      id: uuidv4(),
+      text: 'Ок, буду!',
+      timestamp: new Date().toISOString(),
+      author: 'Ты',
+      isRead: false,
+      status: 'sent',
+    },
   ],
 };
 
-export const useChatStore = create<ChatStore>((set) => ({
+export const useChatStore = create<ChatStore>((set, get) => ({
   chats: initialChats,
   activeChatId: undefined,
   messages: initialMessages,
@@ -77,56 +106,118 @@ export const useChatStore = create<ChatStore>((set) => ({
   },
 
   setChats: (chats) => set({ chats }),
-  setActiveChatId: (activeChatId) => set({ activeChatId }),
+  setActiveChatId: (activeChatId) => {
+    const updatedChats = get().chats.map((chat) =>
+      chat.id === activeChatId ? { ...chat, unreadCount: 0 } : chat
+    );
+    set({ activeChatId, chats: updatedChats });
+  },
 
-  addMessage: (chatId, message) =>
-    set((state) => ({
-      messages: { ...state.messages, [chatId]: [...(state.messages[chatId] || []), message] },
-    })),
+  addMessage: (chatId, message) => {
+    const state = get();
 
-  removeMessage: (chatId, messageId) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [chatId]: state.messages[chatId]?.filter((msg) => msg.id !== messageId) || [],
-      },
-    })),
+    // Добавляем сообщение
+    const updatedMessages = {
+      ...state.messages,
+      [chatId]: [...(state.messages[chatId] || []), message],
+    };
 
-  editMessageText: (chatId, messageId, newText) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [chatId]: state.messages[chatId]?.map((msg) =>
-          msg.id === messageId ? { ...msg, text: newText } : msg
-        ) || [],
-      },
-    })),
+    // Обновляем chats
+    const updatedChats = state.chats.map((chat) =>
+      chat.id === chatId
+        ? {
+            ...chat,
+            lastMessage: message,
+            lastMessageTime: message.timestamp,
+            unreadCount:
+              chat.id === state.activeChatId ? chat.unreadCount : (chat.unreadCount || 0) + 1,
+          }
+        : chat
+    );
 
-  forwardMessage: (messageId, targetChatId) =>
-    set((state) => {
-      const sourceChatId = Number(
-        Object.keys(state.messages).find((chatId) =>
-          state.messages[Number(chatId)].some((msg) => msg.id === messageId)
-        )
-      );
-      if (!sourceChatId) return state;
+    set({ messages: updatedMessages, chats: updatedChats });
+  },
 
-      const originalMessage = state.messages[sourceChatId].find((msg) => msg.id === messageId);
-      if (!originalMessage) return state;
+  editMessageText: (chatId, messageId, newText) => {
+    const state = get();
 
-      const newMessage: ChatMessage = {
-        ...originalMessage,
-        id: uuidv4(),
-        author: 'Ты',
-        timestamp: new Date().toLocaleTimeString(),
-        isRead: false,
-        status: 'sent',
-        forwardedFromId: originalMessage.id,
-        forwardedFromChatId: sourceChatId,
-      };
+    const updatedMessages = {
+      ...state.messages,
+      [chatId]: state.messages[chatId]?.map((msg) =>
+        msg.id === messageId ? { ...msg, text: newText } : msg
+      ) || [],
+    };
 
-      return {
-        messages: { ...state.messages, [targetChatId]: [...(state.messages[targetChatId] || []), newMessage] },
-      };
-    }),
+    const updatedChats = state.chats.map((chat) =>
+      chat.id === chatId
+        ? {
+            ...chat,
+            lastMessage:
+              chat.lastMessage.id === messageId
+                ? { ...chat.lastMessage, text: newText }
+                : chat.lastMessage,
+          }
+        : chat
+    );
+
+    set({ messages: updatedMessages, chats: updatedChats });
+  },
+
+  removeMessage: (chatId, messageId) => {
+    const state = get();
+
+    const updatedMessages = {
+      ...state.messages,
+      [chatId]: state.messages[chatId]?.filter((msg) => msg.id !== messageId) || [],
+    };
+
+    // Обновляем lastMessage, если удаляем его
+    const lastMessage = updatedMessages[chatId]?.[updatedMessages[chatId].length - 1];
+
+    const updatedChats = state.chats.map((chat) =>
+      chat.id === chatId
+        ? { ...chat, lastMessage: lastMessage || chat.lastMessage, lastMessageTime: lastMessage?.timestamp || chat.lastMessageTime }
+        : chat
+    );
+
+    set({ messages: updatedMessages, chats: updatedChats });
+  },
+
+  forwardMessage: (messageId, targetChatId) => {
+    const state = get();
+
+    const sourceChatId = Number(
+      Object.keys(state.messages).find((chatId) =>
+        state.messages[Number(chatId)].some((msg) => msg.id === messageId)
+      )
+    );
+    if (!sourceChatId) return;
+
+    const originalMessage = state.messages[sourceChatId].find((msg) => msg.id === messageId);
+    if (!originalMessage) return;
+
+    const newMessage: ChatMessage = {
+      ...originalMessage,
+      id: uuidv4(),
+      author: state.auth.username,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      status: 'sent',
+      forwardedFromId: originalMessage.id,
+      forwardedFromChatId: sourceChatId,
+    };
+
+    const updatedMessages = {
+      ...state.messages,
+      [targetChatId]: [...(state.messages[targetChatId] || []), newMessage],
+    };
+
+    const updatedChats = state.chats.map((chat) =>
+      chat.id === targetChatId
+        ? { ...chat, lastMessage: newMessage, lastMessageTime: newMessage.timestamp }
+        : chat
+    );
+
+    set({ messages: updatedMessages, chats: updatedChats });
+  },
 }));

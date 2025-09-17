@@ -7,23 +7,25 @@ export interface Auth {
   online: boolean;
 }
 
+// src/types/chat.ts
 export interface ChatMessage {
   id: string;
   text: string;
-  timestamp: string;
   author: string;
+  timestamp: string;
   isRead: boolean;
-  status: 'sent' | 'read' | 'delivered';
-  forwardedFromId?: string;
-  forwardedFromChatId?: number;
+  status: string;
+  attachments?: any[];
+  replyTo?: string; // вместо replyToId
 }
 
 export interface Chat {
   id: number;
   name: string;
   avatar?: string;
-  lastMessage: ChatMessage;
-  lastMessageTime: string;
+  lastMessage?: ChatMessage;
+  lastMessageTime: string; // обязательно
   unreadCount: number;
   isGroup: boolean;
 }
+
