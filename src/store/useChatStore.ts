@@ -1,7 +1,8 @@
 // src/store/useChatStore.ts
 import { create } from 'zustand';
-import { Chat, ChatMessage, Auth } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
+import { Chat, ChatMessage, Auth } from '@/types/chat';
+import { subscribeToChat } from '@/services/chatSocket';
 
 interface ChatStore {
   chats: Chat[];
@@ -11,103 +12,34 @@ interface ChatStore {
 
   setChats: (chats: Chat[]) => void;
   setActiveChatId: (chatId?: number) => void;
-
   addMessage: (chatId: number, message: ChatMessage) => void;
   removeMessage: (chatId: number, messageId: string) => void;
   editMessageText: (chatId: number, messageId: string, newText: string) => void;
   forwardMessage: (messageId: string, targetChatId: number) => void;
+  subscribeToActiveChat: () => void;
 }
 
-// Начальные данные для демонстрации
-const initialChats: Chat[] = [
-  {
-    id: 1,
-    name: 'Тестовый пользователь 1',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User1',
-    lastMessage: {
-      id: uuidv4(),
-      text: 'Привет! Как дела?',
-      author: 'Иван',
-      timestamp: new Date().toISOString(),
-      isRead: true,
-      status: 'read',
-    },
-    lastMessageTime: new Date().toISOString(),
-    unreadCount: 2,
-    isGroup: false,
-  },
-  {
-    id: 2,
-    name: 'Групповой чат',
-    lastMessage: {
-      id: uuidv4(),
-      text: 'Встреча в 15:00',
-      author: 'Аня',
-      timestamp: new Date().toISOString(),
-      isRead: true,
-      status: 'read',
-    },
-    lastMessageTime: new Date().toISOString(),
-    unreadCount: 0,
-    isGroup: true,
-  },
-];
-
-const initialMessages: Record<number, ChatMessage[]> = {
-  1: [
-    {
-      id: uuidv4(),
-      text: 'Привет! Как дела?',
-      timestamp: new Date().toISOString(),
-      author: 'Иван',
-      isRead: true,
-      status: 'read',
-    },
-    {
-      id: uuidv4(),
-      text: 'Хорошо, а у тебя?',
-      timestamp: new Date().toISOString(),
-      author: 'Ты',
-      isRead: false,
-      status: 'sent',
-    },
-  ],
-  2: [
-    {
-      id: uuidv4(),
-      text: 'Встреча в 15:00',
-      timestamp: new Date().toISOString(),
-      author: 'Аня',
-      isRead: true,
-      status: 'read',
-    },
-    {
-      id: uuidv4(),
-      text: 'Ок, буду!',
-      timestamp: new Date().toISOString(),
-      author: 'Ты',
-      isRead: false,
-      status: 'sent',
-    },
-  ],
-};
+const initialChats: Chat[] = [];
+const initialMessages: Record<number, ChatMessage[]> = {};
 
 export const useChatStore = create<ChatStore>((set, get) => ({
   chats: initialChats,
   activeChatId: undefined,
   messages: initialMessages,
   auth: {
-    token: 'test-token',
-    userId: 1,
-    username: 'TestUser',
-    email: 'test@example.com',
-    avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User1',
-    online: true,
+    token: '',
+    userId: 0,
+    username: '',
+    email: '',
+    avatar_url: '',
+    online: false,
   },
 
   setChats: (chats) => set({ chats }),
+
   setActiveChatId: (activeChatId) => {
-    const updatedChats = get().chats.map((chat) =>
+    const state = get();
+    const updatedChats = state.chats.map((chat) =>
       chat.id === activeChatId ? { ...chat, unreadCount: 0 } : chat
     );
     set({ activeChatId, chats: updatedChats });
@@ -116,13 +48,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   addMessage: (chatId, message) => {
     const state = get();
 
-    // Добавляем сообщение
     const updatedMessages = {
       ...state.messages,
       [chatId]: [...(state.messages[chatId] || []), message],
     };
 
-    // Обновляем chats
     const updatedChats = state.chats.map((chat) =>
       chat.id === chatId
         ? {
@@ -140,7 +70,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   editMessageText: (chatId, messageId, newText) => {
     const state = get();
-
     const updatedMessages = {
       ...state.messages,
       [chatId]: state.messages[chatId]?.map((msg) =>
@@ -153,7 +82,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ? {
             ...chat,
             lastMessage:
-              chat.lastMessage.id === messageId
+              chat.lastMessage?.id === messageId
                 ? { ...chat.lastMessage, text: newText }
                 : chat.lastMessage,
           }
@@ -165,18 +94,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   removeMessage: (chatId, messageId) => {
     const state = get();
-
     const updatedMessages = {
       ...state.messages,
       [chatId]: state.messages[chatId]?.filter((msg) => msg.id !== messageId) || [],
     };
 
-    // Обновляем lastMessage, если удаляем его
     const lastMessage = updatedMessages[chatId]?.[updatedMessages[chatId].length - 1];
 
     const updatedChats = state.chats.map((chat) =>
       chat.id === chatId
-        ? { ...chat, lastMessage: lastMessage || chat.lastMessage, lastMessageTime: lastMessage?.timestamp || chat.lastMessageTime }
+        ? {
+            ...chat,
+            lastMessage: lastMessage || undefined,
+            lastMessageTime: lastMessage?.timestamp || '',
+          }
         : chat
     );
 
@@ -185,7 +116,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   forwardMessage: (messageId, targetChatId) => {
     const state = get();
-
     const sourceChatId = Number(
       Object.keys(state.messages).find((chatId) =>
         state.messages[Number(chatId)].some((msg) => msg.id === messageId)
@@ -219,5 +149,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     );
 
     set({ messages: updatedMessages, chats: updatedChats });
+  },
+
+  subscribeToActiveChat: () => {
+    const state = get();
+    const chatId = state.activeChatId;
+    if (!chatId) return;
+
+    // Теперь подписка только с chatId
+    subscribeToChat(chatId);
   },
 }));

@@ -1,30 +1,30 @@
-export interface Auth {
-  token: string;
-  userId: number;
-  username: string;
-  email: string;
-  avatar_url?: string;
-  online: boolean;
-}
+  export interface Auth {
+    token: string;
+    userId: number;
+    username: string;
+    email: string;
+    avatar_url?: string;
+    online: boolean;
+  }
+
+  export interface ChatMessage {
+    id: string;
+    text: string;
+    timestamp: string;
+    author: string;
+    isRead: boolean;
+    status: 'sent' | 'read' | 'delivered';
+    forwardedFromId?: string;
+    forwardedFromChatId?: number;
+  }
 
 // src/types/chat.ts
-export interface ChatMessage {
-  id: string;
-  text: string;
-  author: string;
-  timestamp: string;
-  isRead: boolean;
-  status: string;
-  attachments?: any[];
-  replyTo?: string; // вместо replyToId
-}
-
 export interface Chat {
   id: number;
   name: string;
   avatar?: string;
-  lastMessage?: ChatMessage;
-  lastMessageTime: string; // обязательно
+  lastMessage?: ChatMessage; // <- сделано опциональным
+  lastMessageTime: string;
   unreadCount: number;
   isGroup: boolean;
 }
