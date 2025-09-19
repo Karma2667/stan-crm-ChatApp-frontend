@@ -1,14 +1,19 @@
-import axios from 'axios';
+// src/api/http.ts
+import axios, { AxiosRequestHeaders } from "axios";
 
 export const apiClient = axios.create({
-  baseURL: '/', // через Vite-прокси
-  withCredentials: true,
+  baseURL: "http://localhost:3000/api/v1",
+  headers: {
+    "Content-Type": "application/json",
+  } as AxiosRequestHeaders, // <-- приведение типа
 });
 
-export const setAuthToken = (token?: string) => {
+// Добавляем интерцептор для авторизации
+apiClient.interceptors.request.use(config => {
+  const token = localStorage.getItem("accessToken");
   if (token) {
-    apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  } else {
-    delete apiClient.defaults.headers.common['Authorization'];
+    if (!config.headers) config.headers = {} as AxiosRequestHeaders;
+    config.headers.Authorization = `Bearer ${token}`;
   }
-};
+  return config;
+});

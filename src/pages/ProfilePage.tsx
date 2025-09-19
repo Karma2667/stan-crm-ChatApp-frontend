@@ -1,6 +1,4 @@
 import { useProfile } from "@/hooks/useProfile";
-import { useEffect } from "react";
-import axios from "axios";
 
 export default function ProfilePage() {
   const {
@@ -9,50 +7,11 @@ export default function ProfilePage() {
     message,
     handleAvatarChange,
     handleSaveProfile,
+    handleRemoveAvatar,
     requestPasswordReset,
     handleLogout,
     setProfile,
-    handleRemoveAvatar,
   } = useProfile();
-
-  // 🔹 Логика HTTP ping для онлайн-статуса
-  useEffect(() => {
-  let isMounted = true;
-  let lastPingTime = Date.now();
-
-  const pingPresence = async () => {
-    try {
-      const res = await axios.post("/api/v1/users/ping", {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-      });
-
-      if (!isMounted) return;
-
-      lastPingTime = Date.now();
-      setProfile(prev => prev ? { ...prev, online: res.data.online, last_seen_at: res.data.last_seen_at } : prev);
-    } catch (err) {
-      console.error("Ошибка ping:", err);
-    }
-  };
-
-  pingPresence(); // первый пинг сразу
-
-  const interval = setInterval(() => {
-    // если прошло больше 35 секунд с последнего пинга — считаем offline
-    const now = Date.now();
-    setProfile(prev => prev ? { 
-      ...prev, 
-      online: now - lastPingTime <= 35_000 ? prev.online : false 
-    } : prev);
-
-    pingPresence();
-  }, 25_000);
-
-  return () => {
-    isMounted = false;
-    clearInterval(interval);
-  };
-}, []);
 
   if (!profile) return <p className="text-center mt-10">Загрузка...</p>;
 
@@ -68,6 +27,7 @@ export default function ProfilePage() {
             Назад
           </button>
         </div>
+
         {/* Аватар */}
         <div className="flex flex-col items-center mb-6">
           <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-blue-500">
@@ -75,7 +35,7 @@ export default function ProfilePage() {
               <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-gray-200 flex items-center justify-center text-4xl font-bold text-gray-500">
-                {profile.username ? profile.username.charAt(0).toUpperCase() : "?"}
+                {profile.username?.charAt(0).toUpperCase() || "?"}
               </div>
             )}
           </div>
@@ -112,20 +72,19 @@ export default function ProfilePage() {
           </p>
         </div>
 
-
         {/* Инпуты */}
         <div className="flex flex-col gap-2 mb-6">
           <input
             type="text"
             placeholder="Имя пользователя"
-            value={profile?.username || ""}
-            onChange={(e) => setProfile(profile ? { ...profile, username: e.target.value } : null)}
+            value={profile.username}
+            onChange={(e) => setProfile(prev => prev ? { ...prev, username: e.target.value } : prev)}
             className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <input
             type="text"
             placeholder="Email"
-            value={profile?.email || ""}
+            value={profile.email}
             disabled
             className="px-4 py-2 border rounded-lg bg-gray-100 cursor-not-allowed"
           />

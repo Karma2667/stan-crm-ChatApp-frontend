@@ -5,7 +5,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, register, loading, error, getAppAuth } = useAuthStore();
+  const { login, register, loading, error, isAuthenticated } = useAuthStore();
 
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
@@ -25,13 +25,7 @@ export default function LoginPage() {
           return;
         }
 
-        await register({
-          email,
-          username,
-          password,
-          passwordConfirmation: confirmPassword,
-        });
-
+        await register({ username, email, password, passwordConfirmation: confirmPassword });
         setMessage("✅ Регистрация успешна! Проверьте почту.");
         setEmail("");
         setUsername("");
@@ -40,7 +34,7 @@ export default function LoginPage() {
         setIsRegister(false);
       } else {
         await login({ email, password });
-        if (getAppAuth()) {
+        if (isAuthenticated()) {
           navigate("/", { replace: true });
         } else {
           setMessage("Ошибка: токен не получен");

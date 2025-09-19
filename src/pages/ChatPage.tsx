@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useChatStore } from "@/store/useChatStore";
 import { ChatMessage, Auth } from "@/types/chat";
-import ChatList from "@/components/ChatList";
+import ChatList from "@/components/ChatListWithSearch";
 import ChatWindow from "@/components/ChatWindow";
 
 interface ChatPageProps {
@@ -45,7 +45,9 @@ const ChatPage = ({ auth, webSocket }: ChatPageProps) => {
             chats={chats}
             activeChatId={activeChatId}
             onSelectChat={handleSelectChat}
+            accessToken={auth.token} // <- добавляем токен сюда
           />
+
         </aside>
         <div className="flex-1 flex flex-col overflow-hidden">
           {activeChatId ? (

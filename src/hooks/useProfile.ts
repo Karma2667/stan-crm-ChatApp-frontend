@@ -1,7 +1,7 @@
 // src/hooks/useProfile.ts
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { apiClient } from "@/api/http";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export interface UserProfile {
@@ -15,48 +15,76 @@ export interface UserProfile {
 
 export const useProfile = () => {
   const navigate = useNavigate();
-  const { user, accessToken, refresh, logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
-  // 🔹 Загружаем профиль
+  // 🔹 Загрузка профиля
   useEffect(() => {
-    if (!user || !accessToken) {
+    if (!user) {
       navigate("/login", { replace: true });
       return;
     }
 
     const fetchProfile = async () => {
       try {
-        const res = await axios.get<UserProfile>("/api/v1/users/current", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await apiClient.get<UserProfile>("/users/current");
         setProfile(res.data);
         setAvatarPreview(res.data.avatar_url || null);
       } catch (err: any) {
         console.error("Ошибка загрузки профиля:", err);
-        if (err.response?.status === 401) {
-          try {
-            await refresh();
-            fetchProfile();
-          } catch {
-            setMessage("⚠️ Не удалось обновить токен. Войдите снова.");
-            logout();
-            navigate("/login", { replace: true });
-          }
-        } else {
-          setMessage("⚠️ Не удалось загрузить профиль");
-        }
+        setMessage("⚠️ Не удалось загрузить профиль. Войдите снова.");
+        logout();
+        navigate("/login", { replace: true });
       }
     };
 
     fetchProfile();
-  }, [user, accessToken, refresh, navigate, logout]);
+  }, [user, navigate, logout]);
 
-  // 🔹 Изменение аватара
+  // 🔹 Пинг для онлайн-статуса (каждые 30 секунд)
+// 🔹 Пинг для онлайн-статуса (каждые 30 секунд)
+useEffect(() => {
+  if (!user) return; // проверяем, что пользователь есть
+
+  let isMounted = true;
+  let lastPingTime = Date.now();
+
+  const pingPresence = async () => {
+    try {
+      const res = await apiClient.post("/users/ping");
+      if (!isMounted) return;
+
+      lastPingTime = Date.now();
+      setProfile(prev => prev ? { ...prev, online: res.data.online, last_seen_at: res.data.last_seen_at } : prev);
+    } catch (err) {
+      console.error("Ошибка ping:", err);
+      setProfile(prev => prev ? { ...prev, online: false } : prev);
+    }
+  };
+
+  pingPresence(); // первый пинг сразу
+
+  const interval = setInterval(() => {
+    pingPresence();
+    const now = Date.now();
+    setProfile(prev => prev ? { 
+      ...prev, 
+      online: now - lastPingTime <= 35_000 ? prev.online : false 
+    } : prev);
+  }, 30_000); // интервал 30 секунд
+
+  return () => {
+    isMounted = false;
+    clearInterval(interval);
+  };
+}, [user]); // зависимость только user
+
+
+  // 🔹 Работа с аватаром
   const handleAvatarChange = (file: File) => {
     setAvatarFile(file);
     const reader = new FileReader();
@@ -64,22 +92,16 @@ export const useProfile = () => {
     reader.readAsDataURL(file);
   };
 
-  // 🔹 Сохранение профиля
   const handleSaveProfile = async () => {
-    if (!profile || !accessToken) return;
-
-    let avatarData: any = undefined;
+    if (!profile) return;
+    let avatarData: any;
 
     if (avatarFile) {
       try {
         const formData = new FormData();
         formData.append("file", avatarFile);
-
-        const uploadRes = await axios.post("/api/v1/attachments/upload", formData, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "multipart/form-data",
-          },
+        const uploadRes = await apiClient.post("/attachments/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
 
         avatarData = {
@@ -88,8 +110,7 @@ export const useProfile = () => {
           metadata: uploadRes.data.metadata,
         };
         setAvatarPreview(uploadRes.data.url || avatarPreview);
-      } catch (uploadErr) {
-        console.warn("⚠️ Не удалось загрузить аватар. PATCH пойдёт только с username.", uploadErr);
+      } catch {
         setMessage("⚠️ Не удалось загрузить аватар. Сохраняем только имя пользователя.");
       }
     }
@@ -101,10 +122,7 @@ export const useProfile = () => {
     }
 
     try {
-      const res = await axios.patch("/api/v1/users/profile", body, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
+      const res = await apiClient.patch("/users/profile", body);
       setProfile(prev => prev ? { ...prev, ...res.data } : prev);
       setAvatarPreview(res.data.avatar_url || avatarPreview);
       setMessage("✅ Профиль обновлён!");
@@ -114,17 +132,12 @@ export const useProfile = () => {
     }
   };
 
-  // 🔹 Удаление аватара
   const handleRemoveAvatar = async () => {
-    if (!profile || !accessToken) return;
-
+    if (!profile) return;
     try {
-      const body = { user: { username: profile.username, remove_avatar: true } };
-
-      await axios.patch("/api/v1/users/profile", body, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      await apiClient.patch("/users/profile", {
+        user: { username: profile.username, remove_avatar: true },
       });
-
       setProfile(prev => prev ? { ...prev, avatar_url: null } : prev);
       setAvatarPreview(null);
       setAvatarFile(null);
@@ -135,14 +148,10 @@ export const useProfile = () => {
     }
   };
 
-  // 🔹 Запрос на сброс пароля
   const requestPasswordReset = async () => {
     if (!profile?.email) return;
-
     try {
-      await axios.post("/api/v1/auth/request_password_reset", {
-        auth: { email: profile.email },
-      });
+      await apiClient.post("/auth/request_password_reset", { auth: { email: profile.email } });
       setMessage("📧 Письмо для смены пароля отправлено на почту!");
     } catch (err: any) {
       console.error("Ошибка при сбросе пароля:", err);
@@ -150,15 +159,8 @@ export const useProfile = () => {
     }
   };
 
-  // 🔹 Логаут
   const handleLogout = async () => {
-    try {
-      if (accessToken) {
-        await axios.delete("/api/v1/auth/logout", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-      }
-    } catch {}
+    try { await apiClient.delete("/auth/logout"); } catch {}
     logout();
     navigate("/login", { replace: true });
   };
@@ -171,7 +173,7 @@ export const useProfile = () => {
     setMessage,
     handleAvatarChange,
     handleSaveProfile,
-    handleRemoveAvatar, // <-- добавили
+    handleRemoveAvatar,
     requestPasswordReset,
     handleLogout,
   };
